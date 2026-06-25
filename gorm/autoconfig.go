@@ -12,8 +12,6 @@ import (
 	"context"
 	"time"
 
-	gormcore "github.com/xudefa/go-boot-gorm"
-
 	"github.com/xudefa/go-boot/actuator"
 	"github.com/xudefa/go-boot/boot"
 	"github.com/xudefa/go-boot/condition"
@@ -41,23 +39,23 @@ type GormAutoConfiguration struct{}
 func (g *GormAutoConfiguration) Configure(ctx boot.ApplicationContext) error {
 	env := ctx.Environment()
 
-	opts := []gormcore.Option{
-		gormcore.WithHost(env.GetString(constants.GORMHost, constants.DefaultGORMHost)),
-		gormcore.WithPort(env.GetInt(constants.GORMPort, constants.DefaultGORMPort)),
-		gormcore.WithUser(env.GetString(constants.GORMUsername, constants.DefaultGORMUsername)),
-		gormcore.WithPassword(env.GetString(constants.GORMPassword, constants.DefaultGORMPassword)),
-		gormcore.WithDBName(env.GetString(constants.GORMDatabase, constants.DefaultGORMDatabase)),
-		gormcore.WithCharset(env.GetString(constants.GORMCharset, constants.DefaultGORMCharset)),
-		gormcore.WithParseTime(true),
-		gormcore.WithMaxOpenConns(env.GetInt(constants.GORMMaxOpenConns, constants.DefaultGORMMaxOpenConns)),
-		gormcore.WithMaxIdleConns(env.GetInt(constants.GORMMaxIdleConns, constants.DefaultGORMMaxIdleConns)),
-		gormcore.WithConnMaxLifetime(time.Duration(env.GetInt(constants.GORMConnMaxLifetime, constants.DefaultGORMConnMaxLifetime)) * time.Second),
+	opts := []Option{
+		WithHost(env.GetString(constants.GORMHost, constants.DefaultGORMHost)),
+		WithPort(env.GetInt(constants.GORMPort, constants.DefaultGORMPort)),
+		WithUser(env.GetString(constants.GORMUsername, constants.DefaultGORMUsername)),
+		WithPassword(env.GetString(constants.GORMPassword, constants.DefaultGORMPassword)),
+		WithDBName(env.GetString(constants.GORMDatabase, constants.DefaultGORMDatabase)),
+		WithCharset(env.GetString(constants.GORMCharset, constants.DefaultGORMCharset)),
+		WithParseTime(true),
+		WithMaxOpenConns(env.GetInt(constants.GORMMaxOpenConns, constants.DefaultGORMMaxOpenConns)),
+		WithMaxIdleConns(env.GetInt(constants.GORMMaxIdleConns, constants.DefaultGORMMaxIdleConns)),
+		WithConnMaxLifetime(time.Duration(env.GetInt(constants.GORMConnMaxLifetime, constants.DefaultGORMConnMaxLifetime)) * time.Second),
 	}
 	if tz := env.GetString(constants.GORMTimezone, constants.DefaultGORMTimezone); tz != "" {
-		opts = append(opts, gormcore.WithTimeZone(tz))
+		opts = append(opts, WithTimeZone(tz))
 	}
 
-	db, err := gormcore.OpenMySQL(opts...)
+	db, err := OpenMySQL(opts...)
 	if err != nil {
 		panic(err)
 	}

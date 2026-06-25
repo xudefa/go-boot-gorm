@@ -3,7 +3,6 @@ module github.com/xudefa/go-boot-gorm
 go 1.25.7
 
 require (
-	github.com/stretchr/testify v1.11.1
 	gorm.io/driver/mysql v1.6.0
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/driver/sqlite v1.6.0
@@ -27,13 +26,11 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.45 // indirect
 	github.com/microsoft/go-mssqldb v1.9.8 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
-	github.com/rogpeppe/go-internal v1.14.1 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	golang.org/x/crypto v0.51.0 // indirect
 	golang.org/x/net v0.54.0 // indirect
 	golang.org/x/sync v0.21.0 // indirect
 	golang.org/x/text v0.38.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-require github.com/xudefa/go-boot v1.0.2
+require github.com/xudefa/go-boot v1.0.4

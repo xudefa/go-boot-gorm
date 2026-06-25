@@ -300,8 +300,8 @@ type UserService struct {
 - 使用表格驱动测试（table-driven tests）
 - 测试函数命名：`TestFunctionName_Condition_ExpectedBehavior`
 - 为边界条件和错误路径编写测试
-- 并行测试：使用 `t.Parallel()` 进行并行测试
-- 测试隔离：核心框架测试不依赖外部服务
+- 并行测试：使用 `t.Parallel()` 进行并行测试，但需注意共享资源冲突
+- 测试隔离：数据库测试使用 `:memory:` SQLite 数据库，避免文件冲突
 
 ```go
 func TestCalculateDiscount(t *testing.T) {
@@ -327,12 +327,18 @@ func TestCalculateDiscount(t *testing.T) {
             result, err := CalculateDiscount(tt.basePrice, tt.quantity, tt.tiers)
 
             if tt.expectError {
-                assert.Error(t, err)
+                if err == nil {
+                    t.Fatal("expected error, got nil")
+                }
                 return
             }
 
-            assert.NoError(t, err)
-            assert.Equal(t, tt.expected, result)
+            if err != nil {
+                t.Fatalf("unexpected error: %v", err)
+            }
+            if result != tt.expected {
+                t.Errorf("expected %v, got %v", tt.expected, result)
+            }
         })
     }
 }
@@ -344,6 +350,7 @@ func TestCalculateDiscount(t *testing.T) {
 - 边界条件和错误路径应有对应测试
 - 核心框架测试不依赖外部服务
 - 定期检查测试覆盖率，保持较高水平
+- 使用 `go test -coverprofile=coverage.out && go tool cover -html=coverage.out` 查看覆盖率报告
 
 #### 3.12.3 基准测试
 - 对性能敏感的函数编写基准测试
@@ -365,6 +372,22 @@ func BenchmarkCalculateDiscount(b *testing.B) {
 }
 ```
 
+#### 3.12.4 测试最佳实践
+- **使用标准库断言**：优先使用 `t.Errorf`、`t.Fatalf` 等标准库断言，避免第三方测试库依赖
+- **错误检查**：所有可能失败的操作都必须检查错误，使用 `t.Fatalf` 处理致命错误
+- **资源清理**：使用 `defer` 确保资源正确释放（数据库连接、文件等）
+- **并行测试注意事项**：
+  - 共享数据库文件的测试不应使用 `t.Parallel()`
+  - 每个测试应使用独立的 `:memory:` 数据库或临时文件
+  - 事务测试需要特别注意并发访问冲突
+- **接口验证**：使用编译期接口验证确保类型实现正确
+  ```go
+  var _ data.Transactor = (*DB)(nil)
+  var _ data.Transaction = (*Transaction)(nil)
+  ```
+- **表驱动测试**：对于有多个测试用例的函数，使用表驱动测试模式
+- **测试数据**：测试数据应清晰明了，避免使用魔法数字
+
 ### 3.13 类型与函数规范
 
 - **接受接口，返回具体类型**
@@ -381,24 +404,63 @@ func BenchmarkCalculateDiscount(b *testing.B) {
 - GORM DB 通过 go-boot IoC 容器管理，使用自动配置注册
 - DB 配置项通过 `environment` 注入，支持配置文件和环境变量
 - 常用配置项：
+  - `gorm.enabled`: 是否启用 GORM（默认 `false`）
+  - `gorm.type`: 数据库类型（`mysql`、`postgres`、`sqlserver`、`sqlite`，默认 `mysql`）
   - `gorm.host`: 数据库主机地址（默认 `localhost`）
-  - `gorm.port`: 数据库端口（默认 `3306`）
+  - `gorm.port`: 数据库端口（MySQL 默认 `3306`，PostgreSQL 默认 `5432`）
   - `gorm.username`: 数据库用户名（默认 `root`）
   - `gorm.password`: 数据库密码（默认 `123456`）
   - `gorm.database`: 数据库名称（默认 `test`）
   - `gorm.max-open-conns`: 最大打开连接数（默认 `100`）
   - `gorm.max-idle-conns`: 最大空闲连接数（默认 `10`）
   - `gorm.conn-max-lifetime`: 连接最大生命周期（默认 `3600` 秒）
+  - `gorm.charset`: 字符集（默认 `utf8`）
+  - `gorm.timezone`: 时区（默认 `Local`）
 
-#### 3.14.2 Repository 使用规范
+#### 3.14.2 数据库连接选项
+- 使用函数式选项模式配置数据库连接
+- 常用选项：
+  - `WithDBType(DBType)`: 设置数据库类型
+  - `WithHost(string)`: 设置主机地址
+  - `WithPort(int)`: 设置端口号
+  - `WithUser(string)`: 设置用户名
+  - `WithPassword(string)`: 设置密码
+  - `WithDBName(string)`: 设置数据库名称
+  - `WithDSN(string)`: 直接设置 DSN 字符串
+  - `WithMaxOpenConns(int)`: 设置最大打开连接数
+  - `WithMaxIdleConns(int)`: 设置最大空闲连接数
+  - `WithConnMaxLifetime(time.Duration)`: 设置连接最大生命周期
+  - `WithCharset(string)`: 设置字符集
+  - `WithTimeZone(string)`: 设置时区
+  - `WithSSLMode(string)`: 设置 SSL 模式
+  - `WithParseTime(bool)`: 设置是否解析时间
+
+```go
+// 良好 — 使用选项配置 MySQL
+db, err := gorm.OpenMySQL(
+    gorm.WithHost("localhost"),
+    gorm.WithPort(3306),
+    gorm.WithUser("root"),
+    gorm.WithPassword("123456"),
+    gorm.WithDBName("mydb"),
+    gorm.WithCharset("utf8"),
+    gorm.WithParseTime(true),
+)
+
+// 良好 — 使用 SQLite 内存数据库（测试推荐）
+db, err := gorm.OpenSQLite(gorm.WithDBName(":memory:"))
+```
+
+#### 3.14.3 Repository 使用规范
 - 使用 `gorm.NewRepository[T](db)` 创建泛型 Repository
 - 使用 `gorm.NewRepositoryWithTx[T](tx)` 在事务中创建 Repository
 - Repository 方法应保持简洁，复杂查询使用 `Raw()` 方法
 - 批量操作使用 `CreateBatch()` 方法
+- 条件查询使用 `FindByCondition()`、`DeleteByCondition()`、`UpdateByCondition()`
 
 ```go
 // 良好 — 使用泛型 Repository
-repo := gorm.NewRepository[User](db)
+repo := gorm.NewRepository[User](db.DB())
 user := &User{Name: "John", Age: 30}
 repo.Create(user)
 
@@ -410,12 +472,13 @@ repo.Create(user)
 tx.Commit()
 ```
 
-#### 3.14.3 事务管理规范
+#### 3.14.4 事务管理规范
 - 事务通过 `data.Transaction` 接口管理
 - 使用 `db.Begin(ctx)` 开始事务
 - 使用 `tx.Commit()` 提交事务
 - 使用 `tx.Rollback()` 回滚事务
 - 使用 `defer tx.Close()` 确保资源释放
+- Transaction 实现了 `data.Transactor` 接口，可用于嵌套事务操作
 
 ```go
 // 良好 — 事务管理
@@ -434,11 +497,24 @@ if err := tx.Exec(ctx, "UPDATE users SET age = ? WHERE id = ?", 30, 1); err != n
 return tx.Commit()
 ```
 
-#### 3.14.4 连接池管理
+#### 3.14.5 连接池管理
 - 通过 `WithMaxOpenConns()` 设置最大打开连接数
 - 通过 `WithMaxIdleConns()` 设置最大空闲连接数
 - 通过 `WithConnMaxLifetime()` 设置连接最大生命周期
 - 自动配置从 Environment 读取连接池配置
+- 通过 `db.Stats()` 获取连接池统计信息
+
+#### 3.14.6 健康检查
+- 自动注册 `databaseHealthIndicator` Bean
+- 实现 `health.Indicator` 接口
+- 通过 `db.DB().DB().PingContext(ctx)` 检查数据库连接状态
+- 返回 UP/DOWN 状态及详细信息
+
+#### 3.14.7 自动迁移
+- 使用 `NewStarter(db, models)` 创建启动器
+- 使用 `NewAutoMigrateStarter(db, models...)` 创建自动迁移启动器
+- 启动器在应用启动时自动执行模型迁移
+- 通过 `boot.RegisterStarter()` 注册启动器
 
 ## 4. 代码质量与工具
 

@@ -6,7 +6,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/xudefa/go-boot/data"
 )
 
@@ -40,7 +39,12 @@ func TestOpenWithOptions(t *testing.T) {
 
 // TestDB_Begin 测试开启数据库事务，验证返回的事务对象不为空
 func TestDB_Begin(t *testing.T) {
-	db, _ := OpenSQLite(WithDBName(":memory:"))
+	db, err := OpenSQLite(WithDBName(":memory:"))
+	if err != nil {
+		t.Fatalf("OpenSQLite failed: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
 	tx, err := db.Begin(context.Background())
 	if err != nil {
 		t.Fatalf("Begin failed: %v", err)
@@ -53,77 +57,170 @@ func TestDB_Begin(t *testing.T) {
 // TestDB_Query 测试执行原生查询 SQL，验证返回的行集不为空且无错误
 func TestDB_Query(t *testing.T) {
 	ctx := context.Background()
-	db, _ := OpenSQLite(WithDBName(":memory:"))
+	db, err := OpenSQLite(WithDBName(":memory:"))
+	if err != nil {
+		t.Fatalf("OpenSQLite failed: %v", err)
+	}
 	defer func() { _ = db.Close() }()
 
 	rows, err := db.Query(ctx, "SELECT 1")
-	assert.NoError(t, err)
+	if err != nil {
+		t.Fatalf("Query failed: %v", err)
+	}
 	defer func() { _ = rows.Close() }()
-	assert.NotNil(t, rows)
+	if rows == nil {
+		t.Fatal("rows should not be nil")
+	}
 }
 
 // TestDB_QueryRow 测试查询单行数据并扫描到变量，验证结果值为 1
 func TestDB_QueryRow(t *testing.T) {
 	ctx := context.Background()
-	db, _ := OpenSQLite(WithDBName(":memory:"))
+	db, err := OpenSQLite(WithDBName(":memory:"))
+	if err != nil {
+		t.Fatalf("OpenSQLite failed: %v", err)
+	}
 	defer func() { _ = db.Close() }()
 
 	row := db.QueryRow(ctx, "SELECT 1")
 	var val int
-	err := row.Scan(&val)
-	assert.NoError(t, err)
-	assert.Equal(t, 1, val)
+	err = row.Scan(&val)
+	if err != nil {
+		t.Fatalf("Scan failed: %v", err)
+	}
+	if val != 1 {
+		t.Errorf("expected 1, got %d", val)
+	}
 }
 
 // TestDB_Exec 测试执行 DDL 语句（建表），验证执行结果不为空
 func TestDB_Exec(t *testing.T) {
 	ctx := context.Background()
-	db, _ := OpenSQLite(WithDBName(":memory:"))
+	db, err := OpenSQLite(WithDBName(":memory:"))
+	if err != nil {
+		t.Fatalf("OpenSQLite failed: %v", err)
+	}
 	defer func() { _ = db.Close() }()
 
 	result, err := db.Exec(ctx, "CREATE TABLE test (id INTEGER)")
-	assert.NoError(t, err)
-	assert.NotNil(t, result)
+	if err != nil {
+		t.Fatalf("Exec failed: %v", err)
+	}
+	if result == nil {
+		t.Fatal("result should not be nil")
+	}
 }
 
 // TestDB_Stats 测试获取数据库统计信息，验证返回的统计对象不为空
 func TestDB_Stats(t *testing.T) {
-	db, _ := OpenSQLite(WithDBName(":memory:"))
+	db, err := OpenSQLite(WithDBName(":memory:"))
+	if err != nil {
+		t.Fatalf("OpenSQLite failed: %v", err)
+	}
 	defer func() { _ = db.Close() }()
 
 	stats := db.Stats()
-	assert.NotNil(t, stats)
+	_ = stats
 }
 
 // TestTransaction_Commit 测试提交事务，验证提交无错误
 func TestTransaction_Commit(t *testing.T) {
-	db, _ := OpenSQLite(WithDBName(":memory:"))
-	tx, _ := db.Begin(context.Background())
-	err := tx.Commit()
-	assert.NoError(t, err)
+	db, err := OpenSQLite(WithDBName(":memory:"))
+	if err != nil {
+		t.Fatalf("OpenSQLite failed: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	tx, err := db.Begin(context.Background())
+	if err != nil {
+		t.Fatalf("Begin failed: %v", err)
+	}
+	err = tx.Commit()
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
 }
 
 // TestTransaction_Rollback 测试回滚事务，验证回滚无错误
 func TestTransaction_Rollback(t *testing.T) {
-	db, _ := OpenSQLite(WithDBName(":memory:"))
-	tx, _ := db.Begin(context.Background())
-	err := tx.Rollback()
-	assert.NoError(t, err)
+	db, err := OpenSQLite(WithDBName(":memory:"))
+	if err != nil {
+		t.Fatalf("OpenSQLite failed: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	tx, err := db.Begin(context.Background())
+	if err != nil {
+		t.Fatalf("Begin failed: %v", err)
+	}
+	err = tx.Rollback()
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
 }
 
 // TestTransaction_Close 测试关闭事务，验证关闭无错误
 func TestTransaction_Close(t *testing.T) {
-	db, _ := OpenSQLite(WithDBName(":memory:"))
-	tx, _ := db.Begin(context.Background())
-	err := tx.Close()
-	assert.NoError(t, err)
+	db, err := OpenSQLite(WithDBName(":memory:"))
+	if err != nil {
+		t.Fatalf("OpenSQLite failed: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	tx, err := db.Begin(context.Background())
+	if err != nil {
+		t.Fatalf("Begin failed: %v", err)
+	}
+	err = tx.Close()
+	if err != nil {
+		t.Errorf("expected no error, got %v", err)
+	}
+}
+
+// TestClient 测试创建 GORM Client 包装对象，验证不为空
+func TestClient(t *testing.T) {
+	db, err := OpenSQLite(WithDBName(":memory:"))
+	if err != nil {
+		t.Fatalf("OpenSQLite failed: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	client := NewClient(db.DB())
+	if client == nil {
+		t.Error("NewClient should return client")
+	}
+}
+
+// TestDB_ImplementsTransactor 验证 DB 实现了 data.Transactor 接口
+func TestDB_ImplementsTransactor(t *testing.T) {
+	t.Parallel()
+
+	db, err := OpenSQLite(WithDBName(":memory:"))
+	if err != nil {
+		t.Fatalf("OpenSQLite failed: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	var _ data.Transactor = db
 }
 
 // TestTransaction_ImplementsTransactionInterface 编译时检查 Transaction 是否实现了 data.Transaction 接口
 func TestTransaction_ImplementsTransactionInterface(t *testing.T) {
-	db, _ := OpenSQLite(WithDBName(":memory:"))
-	tx, _ := db.Begin(context.Background())
-	_ = tx.Rollback()
+	t.Parallel()
+
+	db, err := OpenSQLite(WithDBName(":memory:"))
+	if err != nil {
+		t.Fatalf("OpenSQLite failed: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	tx, err := db.Begin(context.Background())
+	if err != nil {
+		t.Fatalf("Begin failed: %v", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	var _ data.Transaction = tx
 }
 
 // TestRepository_Create 测试 Repository 的 Create 方法，验证创建记录后 ID 被自动填充
@@ -304,15 +401,6 @@ func TestRepository_ImplementsRepositoryInterface(t *testing.T) {
 		Name string
 	}
 	var _ data.Repository[User] = (*Repository[User])(nil)
-}
-
-// TestClient 测试创建 GORM Client 包装对象，验证不为空
-func TestClient(t *testing.T) {
-	db, _ := OpenSQLite(WithDBName(":memory:"))
-	client := NewClient(db.DB())
-	if client == nil {
-		t.Error("NewClient should return client")
-	}
 }
 
 // TestConfig_DSNForMySQL 测试生成 MySQL 的 DSN 连接串，验证不为空且长度合理
